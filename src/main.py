@@ -87,7 +87,8 @@ def evaluate_environment(temp, lux, presence, pwr):
 # Loop de Execucao
 
 print("Teste")
-print("SmartRoom Monitor — Iniciando Auditoria Energetica...")
+print("--- SmartRoom Monitor ---")
+print("\tIniciando Auditoria Energetica...")
 
 while True:
     # Leitura dos sensores
