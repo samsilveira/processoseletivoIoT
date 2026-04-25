@@ -1,7 +1,130 @@
 {
   "version": 1,
-  "author": "Uri Shaked",
+  "author": "Samuel Wagner Tiburi Silveira",
   "editor": "wokwi",
-  "parts": [ { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 0, "left": 0, "attrs": {} } ],
-  "connections": [ [ "esp:TX", "$serialMonitor:RX", "", [] ], [ "esp:RX", "$serialMonitor:TX", "", [] ] ]
+  "parts": [
+    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 0, "left": 0, "attrs": {} },
+    {
+      "type": "wokwi-ntc-temperature-sensor",
+      "id": "ntc1",
+      "top": -100,
+      "left": -310,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-photoresistor-sensor",
+      "id": "ldr1",
+      "top": -270,
+      "left": -250,
+      "rotate": 90,
+      "attrs": {}
+    },
+    { "type": "wokwi-pir-motion-sensor", "id": "pir1", "top": -270, "left": 10, "attrs": {} },
+    {
+      "type": "wokwi-potentiometer",
+      "id": "pot_pwr",
+      "top": -100,
+      "left": 200,
+      "attrs": { "label": "Consumo" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led_ok",
+      "top": 225,
+      "left": -200,
+      "attrs": { "color": "green", "label": "OK" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led_warning",
+      "top": 150,
+      "left": -200,
+      "attrs": { "color": "yellow", "label": "Aviso" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led_critical",
+      "top": 73.2,
+      "left": -197.8,
+      "attrs": { "color": "red", "label": "Critico" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r1",
+      "top": 265,
+      "left": -130,
+      "rotate": 180,
+      "attrs": { "value": "220" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r2",
+      "top": 190,
+      "left": -130,
+      "rotate": 180,
+      "attrs": { "value": "220" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r3",
+      "top": 110,
+      "left": -130,
+      "rotate": 180,
+      "attrs": { "value": "220" }
+    },
+    {
+      "type": "wokwi-text",
+      "id": "text1",
+      "top": -124.8,
+      "left": -326.4,
+      "attrs": { "text": "Sensor de Temperatura" }
+    },
+    {
+      "type": "wokwi-text",
+      "id": "text2",
+      "top": -355.2,
+      "left": -201.6,
+      "attrs": { "text": "Sensor de Luminosidade" }
+    },
+    {
+      "type": "wokwi-text",
+      "id": "text3",
+      "top": -297.6,
+      "left": -19.2,
+      "attrs": { "text": "Sensor de Presenca" }
+    },
+    {
+      "type": "wokwi-text",
+      "id": "text4",
+      "top": -134.4,
+      "left": 124.8,
+      "attrs": { "text": "Sensor de Consumo (Simulado)" }
+    }
+  ],
+  "connections": [
+    [ "esp:TX", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX", "$serialMonitor:TX", "", [] ],
+    [ "esp:GND", "ntc1:GND", "black", [] ],
+    [ "esp:3V3", "ntc1:VCC", "red", [] ],
+    [ "ntc1:OUT", "esp:34", "black", [] ],
+    [ "esp:GND", "ldr1:GND", "black", [] ],
+    [ "esp:3V3", "ldr1:VCC", "red", [] ],
+    [ "ldr1:AO", "esp:35", "black", [] ],
+    [ "esp:GND", "pir1:GND", "black", [] ],
+    [ "esp:3V3", "pir1:VCC", "red", [] ],
+    [ "pir1:OUT", "esp:33", "black", [] ],
+    [ "esp:GND", "pot_pwr:GND", "black", [] ],
+    [ "esp:3V3", "pot_pwr:VCC", "red", [] ],
+    [ "pot_pwr:SIG", "esp:32", "black", [] ],
+    [ "esp:14", "r1:1", "green", [] ],
+    [ "r1:2", "led_ok:A", "green", [] ],
+    [ "led_ok:C", "esp:GND.1", "black", [ "h-26.2", "v40.2", "h192", "v-153.6" ] ],
+    [ "esp:27", "r2:1", "yellow", [] ],
+    [ "r2:2", "led_warning:A", "yellow", [] ],
+    [ "led_warning:C", "esp:GND.1", "black", [ "h-26.2", "v115.2", "h192", "v-153.6" ] ],
+    [ "esp:26", "r3:1", "red", [] ],
+    [ "r3:2", "led_critical:A", "red", [] ],
+    [ "led_critical:C", "esp:GND.1", "black", [ "h-28.4", "v192", "h192", "v-153.6" ] ]
+  ],
+  "dependencies": {}
 }
