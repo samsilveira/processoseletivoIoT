@@ -3,12 +3,19 @@
   "author": "Samuel Wagner Tiburi Silveira",
   "editor": "wokwi",
   "parts": [
-    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 0, "left": 0, "attrs": {} },
+    { 
+      "type": "board-esp32-devkit-c-v4", 
+      "id": "esp", 
+      "top": 0, 
+      "left": 0, 
+      "attrs": {} 
+    },
     {
       "type": "wokwi-ntc-temperature-sensor",
       "id": "ntc1",
-      "top": -100,
-      "left": -310,
+      "top": -113.1,
+      "left": -355.7,
+      "rotate": 90,
       "attrs": {}
     },
     {
@@ -19,13 +26,19 @@
       "rotate": 90,
       "attrs": {}
     },
-    { "type": "wokwi-pir-motion-sensor", "id": "pir1", "top": -270, "left": 10, "attrs": {} },
-    {
-      "type": "wokwi-potentiometer",
-      "id": "pot_pwr",
-      "top": -100,
-      "left": 200,
-      "attrs": { "label": "Consumo" }
+    { 
+      "type": "wokwi-pir-motion-sensor", 
+      "id": "pir1", 
+      "top": -270, 
+      "left": 10, 
+      "attrs": {} 
+    },
+    { 
+      "type": "wokwi-potentiometer", 
+      "id": "pot_pwr", 
+      "top": -100, 
+      "left": 200, 
+      "attrs": {} 
     },
     {
       "type": "wokwi-led",
@@ -75,8 +88,8 @@
     {
       "type": "wokwi-text",
       "id": "text1",
-      "top": -124.8,
-      "left": -326.4,
+      "top": -172.8,
+      "left": -374.4,
       "attrs": { "text": "Sensor de Temperatura" }
     },
     {
@@ -91,7 +104,7 @@
       "id": "text3",
       "top": -297.6,
       "left": -19.2,
-      "attrs": { "text": "Sensor de Presenca" }
+      "attrs": { "text": "Sensor de Presença" }
     },
     {
       "type": "wokwi-text",
@@ -104,18 +117,18 @@
   "connections": [
     [ "esp:TX", "$serialMonitor:RX", "", [] ],
     [ "esp:RX", "$serialMonitor:TX", "", [] ],
-    [ "esp:GND", "ntc1:GND", "black", [] ],
-    [ "esp:3V3", "ntc1:VCC", "red", [] ],
-    [ "ntc1:OUT", "esp:34", "black", [] ],
-    [ "esp:GND", "ldr1:GND", "black", [] ],
-    [ "esp:3V3", "ldr1:VCC", "red", [] ],
-    [ "ldr1:AO", "esp:35", "black", [] ],
-    [ "esp:GND", "pir1:GND", "black", [] ],
-    [ "esp:3V3", "pir1:VCC", "red", [] ],
-    [ "pir1:OUT", "esp:33", "black", [] ],
-    [ "esp:GND", "pot_pwr:GND", "black", [] ],
-    [ "esp:3V3", "pot_pwr:VCC", "red", [] ],
-    [ "pot_pwr:SIG", "esp:32", "black", [] ],
+    [ "esp:GND.2", "ntc1:GND", "black", [ "v-28.8", "h-273.56", "h-105.6" ] ],
+    [ "esp:3V3", "ntc1:VCC", "red", [ "v-19.2", "h-292.61" ] ],
+    [ "ntc1:OUT", "esp:34", "blue", [ "h0.1", "v28.8", "h249.6", "v48" ] ],
+    [ "esp:GND.2", "ldr1:GND", "black", [ "v-115.2", "h-259.26" ] ],
+    [ "esp:3V3", "ldr1:VCC", "red", [ "v-19.2", "h-153.11" ] ],
+    [ "ldr1:AO", "esp:35", "violet", [ "v10.5", "h139.6", "v220.8" ] ],
+    [ "esp:GND.2", "pir1:GND", "black", [ "h0.04", "v-182.4", "h-35.16" ] ],
+    [ "esp:3V3", "pir1:VCC", "red", [ "v-9.6", "h41.57" ] ],
+    [ "pir1:OUT", "esp:33", "gray", [ "v24.4", "h-75.12", "v249.6" ] ],
+    [ "esp:GND.2", "pot_pwr:GND", "black", [ "v-28.8", "h128.24" ] ],
+    [ "esp:3V3", "pot_pwr:VCC", "red", [ "v-19.2", "h244.39" ] ],
+    [ "pot_pwr:SIG", "esp:32", "purple", [ "v21.9", "h-267.8", "v96" ] ],
     [ "esp:14", "r1:1", "green", [] ],
     [ "r1:2", "led_ok:A", "green", [] ],
     [ "led_ok:C", "esp:GND.1", "black", [ "h-26.2", "v40.2", "h192", "v-153.6" ] ],
