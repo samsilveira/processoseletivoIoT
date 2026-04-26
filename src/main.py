@@ -21,28 +21,40 @@ led_ok       = machine.Pin(14, machine.Pin.OUT)
 led_warning  = machine.Pin(27, machine.Pin.OUT)
 led_critical = machine.Pin(26, machine.Pin.OUT)
 
-# Constantes e Variaveis de Controle
+# Constantes de Conversao e Limiares (Histerese)
 
-BETA    = 3950
-GAMMA   = 0.7
-RL10    = 50
-V_REF   = 3.3
-ADC_RES = 4095
+BETA          = 3950
+GAMMA         = 0.7
+RL10          = 50
+V_REF         = 3.3
+ADC_RES       = 4095
 
-# Media Movel
-WINDOW = 10
+# Thresholds com Histerese (Entrada / Saida)
+TEMP_AC_ON    = 23.0;  TEMP_AC_OFF    = 25.0
+LUX_LIGHT_ON  = 300;   LUX_LIGHT_OFF  = 200
+PWR_CRIT_ON   = 85.0;  PWR_CRIT_OFF   = 80.0
+PWR_WARN_ON   = 65.0;  PWR_WARN_OFF   = 60.0
+
+# Configuracoes de Tempo
+PRESENCE_TIMEOUT_MS = 30000 # 30 segundos de persistencia
+WINDOW              = 10
+sample_interval     = 100
+log_interval        = 1000
+
+# Variaveis Globais e Buffers
 buffers = {"temp": [], "lux": [], "pwr": []}
+last_sample_time   = 0
+last_log_time      = 0
+last_blink_time    = 0
+last_presence_time = 0
+blink_led_state    = False
 
-# Temporizacao (Nao bloqueante)
-last_sample_time = 0
-last_log_time    = 0
-last_blink_time  = 0
-sample_interval  = 100  # 100ms para leitura e processamento
-log_interval     = 1000 # 1s para log serial
-
-# Estado Global
+# Inicializacao de Variaveis de Estado (Evita NameError)
+temp = 25.0
+lux  = 0.0
+pwr  = 0.0
+presence = False
 current_state = "OK"
-blink_led_state = False
 
 # Funcoes de Processamento
 
@@ -56,11 +68,7 @@ def smooth(key, val):
 def get_temperature(raw_val):
     if raw_val <= 0: raw_val = 1
     if raw_val >= ADC_RES: raw_val = ADC_RES - 1
-
-    # a resistencia do sensor diminui com o aumento da temperatura (NTC)
-    # Formula correta para a resistencia do NTC no circuito do Wokwi
     r_ntc = 10000 / (ADC_RES / raw_val - 1)
-
     t_kelvin = 1 / (1/298.15 + (1/BETA) * math.log(r_ntc / 10000))
     return round(t_kelvin - 273.15, 1)
 
@@ -76,19 +84,23 @@ def get_lux(raw_val):
 def get_pwr(raw_val):
     return round((raw_val / ADC_RES) * 100, 1)
 
+def update_presence(raw_pir, current_ms):
+    global last_presence_time
+    if raw_pir == 1:
+        last_presence_time = current_ms
+    return (current_ms - last_presence_time) < PRESENCE_TIMEOUT_MS
+
 # Atuacao e Feedback Visual
 
 def update_visuals(state, current_ms):
     global last_blink_time, blink_led_state
 
-    # Define intervalos de pisca: Critico = 200ms (Rapido), Aviso = 600ms (Lento)
     blink_interval = 200 if state == "CRITICO" else 600
 
     if current_ms - last_blink_time >= blink_interval:
         blink_led_state = not blink_led_state
         last_blink_time = current_ms
 
-    # Logica de acionamento
     if state == "OK":
         led_ok.value(1)
         led_warning.value(0)
@@ -102,16 +114,27 @@ def update_visuals(state, current_ms):
         led_warning.value(0)
         led_critical.value(1 if blink_led_state else 0)
 
-# Logica de Decisao
+# Logica de Decisao com Histerese
 
-def evaluate(temp, lux, presence, pwr):
-    if not presence:
-        if temp < 23.0 or lux > 300:
-            return "CRITICO"
-    if pwr > 85.0:
+def evaluate(t, l, pres, p, prev_state):
+    in_alert = prev_state in ("CRITICO", "AVISO")
+
+    # Selecao de limiares baseada no estado anterior (Histerese)
+    t_thr  = TEMP_AC_OFF   if in_alert else TEMP_AC_ON
+    l_thr  = LUX_LIGHT_OFF if in_alert else LUX_LIGHT_ON
+    p_crit = PWR_CRIT_OFF  if in_alert else PWR_CRIT_ON
+    p_warn = PWR_WARN_OFF  if in_alert else PWR_WARN_ON
+
+    # Regra Critica: Desperdicio (Sala vazia + AC ou Luz) ou Sobrecarga
+    if not pres and (t < t_thr or l > l_thr):
         return "CRITICO"
-    if pwr > 65.0 or (presence and lux > 800):
+    if p > p_crit:
+        return "CRITICO"
+
+    # Regra de Aviso: Consumo elevado ou Luz excessiva com baixa carga
+    if p > p_warn or (pres and l > 800 and p < 40.0):
         return "AVISO"
+
     return "OK"
 
 # Loop Principal
@@ -127,21 +150,21 @@ while True:
     if current_ms - last_sample_time >= sample_interval:
         last_sample_time = current_ms
 
-        # Leitura com media movel
+        # Leitura e Suavizacao
         raw_t = smooth("temp", adc_ntc.read())
         raw_l = smooth("lux", adc_ldr.read())
         raw_p = smooth("pwr", adc_pwr.read())
 
-        # Conversao fisica
-        temp = get_temperature(raw_t)
-        lux  = get_lux(raw_l)
-        pwr  = get_pwr(raw_p)
-        presence = pin_pir.value() == 1
+        # Conversao Fisica
+        temp     = get_temperature(raw_t)
+        lux      = get_lux(raw_l)
+        pwr      = get_pwr(raw_p)
+        presence = update_presence(pin_pir.value(), current_ms)
 
-        # Avaliacao de estado
-        current_state = evaluate(temp, lux, presence, pwr)
+        # Avaliacao de estado com Histerese
+        current_state = evaluate(temp, lux, presence, pwr, current_state)
 
-    # Tarefa 2: Feedback Visual (Continuo para permitir pisca)
+    # Tarefa 2: Feedback Visual
     update_visuals(current_state, current_ms)
 
     # Tarefa 3: Log Serial (1000ms)
