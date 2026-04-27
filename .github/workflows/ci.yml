@@ -35,5 +35,4 @@ jobs:
       with:
         token: ${{ secrets.WOKWI_API_KEY }}
         path: /
-        timeout: 60000
         expect_text: '--- SmartRoom Monitor ---'
