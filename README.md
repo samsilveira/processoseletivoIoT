@@ -1,331 +1,140 @@
-# Processo Seletivo – Intensivo Maker | IoT
-## Etapa Prática – Sistemas Embarcados
+# SmartRoom Monitor: Auditoria Energética Autônoma para Ambientes Inteligentes
 
-Bem-vindo(a) à **etapa prática do processo seletivo para o Intensivo Maker | IoT**.
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/SamuelSilveira/processoseletivoIoT/actions)
+[![MicroPython](https://img.shields.io/badge/micropython-1.x-blue)](https://micropython.org)
+[![Wokwi](https://img.shields.io/badge/simulator-Wokwi-orange)](https://wokwi.com)
 
-Esta atividade tem como objetivo avaliar suas competências em **Sistemas Embarcados**, com foco em **organização de projeto, lógica de firmware e simulação de hardware**, a partir da aplicação prática dos conhecimentos adquiridos nos cursos EAD da etapa anterior.
-
-> 🎯 **Objetivo principal**  
-> Avaliar sua capacidade de **planejar, estruturar e desenvolver** uma solução funcional de sistemas embarcados, seguindo boas práticas de engenharia.
-
----
-
-## 🏁 Passo 0 – Antes de Tudo
-
-Se você **nunca utilizou Git ou GitHub**, não se preocupe.  
-Siga atentamente os passos abaixo — eles fazem parte do processo de aprendizagem esperado.
+*Nome:* Samuel Wagner Tiburi Silveira
+*Instituição:* Universidade Federal do Cariri (UFCA)
+*GitHub:* [samsilveira](https://github.com/samsilveira)
 
 ---
 
-### 1️⃣ Criação de Conta no GitHub
+![Circuito do SmartRoom Monitor](img/circuito.png)
 
-1. Acesse: https://github.com  
-2. Clique em **Sign up**  
-3. Crie sua conta gratuita seguindo as instruções da plataforma  
-
-> 📌 O GitHub será utilizado para:
-> - Envio do seu projeto  
-> - Versionamento do código  
-> - Correção e validação automática via GitHub Actions  
+**Figura:** Simulação no Wokwi com Sensor NTC (GPIO 34), LDR (GPIO 35), PIR (GPIO 33), Potenciômetro de Carga (GPIO 32) e LEDs de controle (GPIO 14, 27 e 26).
 
 ---
 
-### 2️⃣ Instalação do Git
+## 1. Visão Geral
 
-O **Git** é a ferramenta responsável pelo controle de versões do seu código.
+O **SmartRoom Monitor** é um sistema embarcado autônomo projetado para auditoria energética em tempo real. O foco central é combater o desperdício em salas de aula e escritórios, identificando quando sistemas de climatização e iluminação permanecem ativos em ambientes desocupados.
 
-### Windows
-Baixe e instale o **Git Bash**:  
-https://git-scm.com/downloads
+Diferente de sistemas que apenas reportam dados, o SmartRoom Monitor processa a telemetria localmente e gera alertas visuais e logs estruturados, operando como um "sentinela" de eficiência energética sem a necessidade de processamento em nuvem para a tomada de decisão crítica.
 
-### Linux / macOS
-Verifique se o Git já está instalado:
+---
 
-```bash
-git --version
+## 2. Arquitetura da Solução
+
+O firmware utiliza uma arquitetura baseada em camadas para garantir modularidade e facilitar a calibração individual de cada sensor:
+
 ```
-> Caso não esteja, instale pelo gerenciador de pacotes do seu sistema.
-
-## ⚙ Passo 1 – Preparando o Ambiente
-
-Para desenvolver o desafio, você deverá criar uma cópia deste repositório no seu GitHub.
-
-### 1️⃣ Fork do Repositório
-No canto superior direito desta página, clique em Fork
-
-<img width="219" height="45" alt="image" src="https://github.com/user-attachments/assets/5d629626-513a-445c-ba0f-e5bb3e225187" />
-
-
-Uma cópia do repositório será criada no seu perfil do GitHub
-
-> 🔎 O Fork permite que você trabalhe de forma independente, sem alterar o repositório original do processo seletivo.
-
-### 2️⃣ Clone do Repositório
-
-No repositório do seu Fork, clique em **<> Code**
-
-<img width="149" height="52" alt="image" src="https://github.com/user-attachments/assets/abbd331b-a005-4633-89c6-afd16acbe828" />
-
-Copie a URL e execute no terminal:
-
-```bash
-git clone https://github.com/SEU_USUARIO/nome-do-repositorio.git
-cd nome-do-repositorio
+┌───────────────────────────────────────────────┐
+│         Camada de Apresentação                │
+│  (Monitor Serial - Logs estruturados em JSON) │
+└───────────────────────────────────────────────┘
+                      ↕
+┌───────────────────────────────────────────────┐
+│         Camada de Atuação                     │
+│  • Alerta Crítico (LED Vermelho - GPIO 26)    │
+│  • Alerta de Aviso (LED Amarelo - GPIO 27)    │
+│  • Estado Eficiente (LED Verde - GPIO 14)     │
+└───────────────────────────────────────────────┘
+                      ↕
+┌───────────────────────────────────────────────┐
+│         Camada de Processamento               │
+│  • Média móvel (suavização de ruído)          │
+│  • Lógica de decisão com histerese            │
+│  • Latch de presença (Timeout de 30s)         │
+└───────────────────────────────────────────────┘
+                      ↕
+┌───────────────────────────────────────────────┐
+│         Camada de Percepção                   │
+│  • ADC Temperatura (NTC)                      │
+│  • ADC Luminosidade (LDR)                     │
+│  • Digital Presença (PIR)                     │
+│  • ADC Carga Simulada (Potenciômetro)         │
+└───────────────────────────────────────────────┘
 ```
 
-> O comando git clone cria uma cópia local do repositório para desenvolvimento.
+### Dinâmica de Funcionamento
 
-### 3️⃣ Preparação do Ambiente de Execução
+1.  **Percepção:** Coleta contínua de dados analógicos com resolução de 12 bits e sinais digitais.
+2.  **Processamento:** Os dados brutos passam por um filtro de média móvel (janela de 10 amostras). A presença é validada por um latch que mantém o estado "ocupado" por 30 segundos após o último movimento detectado pelo sensor PIR.
+3.  **Decisão:** Uma máquina de estados aplica limiares com histerese para evitar oscilações rápidas (chattering) nos atuadores.
+4.  **Atuação:** Resposta visual imediata. Os LEDs piscam em frequências distintas conforme a gravidade: Crítico (200ms) e Aviso (600ms).
 
-Você pode executar o projeto de duas formas. Escolha apenas uma.
+---
 
-#### 🔹 Opção A – Ambiente Python Local
+## 3. Hardware e Componentes
 
-**Requisitos:**
+| Componente | Especificação | Função |
+|---|---|---|
+| **MCU** | ESP32-DevKit-C-V4 | Processador principal |
+| **Sensor NTC** | Analógico (GPIO 34) | Medição de temperatura (Equação Steinhart-Hart) |
+| **Sensor LDR** | Analógico (GPIO 35) | Medição de luminosidade (Lux) |
+| **Sensor PIR** | Digital (GPIO 33) | Detecção de presença/movimento |
+| **Potenciômetro** | Analógico (GPIO 32) | Simulador de carga energética (0-100%) |
+| **LEDs** | 3x (Verde, Amarelo, Vermelho) | Feedback visual de estado |
 
-- Python 3.10 ou 3.11
-- pip
+---
 
-**Instale as dependências:**
+## 4. Decisões Técnicas Relevantes
 
-```bash
-pip install -r requirements.txt
+### 4.1 Temporização Não-Bloqueante e Robustez de Tempo
+O uso de `time.sleep()` foi totalmente banido em favor de uma estrutura baseada em `time.ticks_ms()` e `time.ticks_diff()`.
+- **Prevenção de Overflow:** O uso de `time.ticks_diff()` é uma decisão crítica de engenharia que garante que o cálculo de intervalos permaneça correto mesmo após o rollover (estouro) do contador de milissegundos do hardware, permitindo operação contínua de longo prazo.
+- **Multitarefa Cooperativa:** Essa abordagem permite que o sistema processe sensores a 10Hz, emita logs a 1Hz e gerencie o pisca-pisca dos LEDs simultaneamente, mantendo a responsividade total.
+
+### 4.2 Robustez com Histerese e Latch de Presença
+Para evitar alarmes falsos e instabilidade operacional:
+- **Histerese:** Foram definidos thresholds de entrada e saída distintos. O alerta de climatização, por exemplo, é ativado em 23°C, mas só é desativado quando a temperatura sobe acima de 25°C.
+- **Latch de PIR e Inicialização Segura:** Sensores PIR detectam movimento, não presença estática. O firmware implementa um timeout de 30 segundos de persistência.
+- **Prevenção de Falso Positivo no Boot:** O estado de presença é inicializado via software como "expirado" (fora do intervalo de timeout), garantindo que o sistema comece corretamente em estado desocupado e não gere alertas falsos nos primeiros 30 segundos após a inicialização.
+
+### 4.3 Matemática Embarcada e Proteção de Operações
+O firmware realiza o processamento real das grandezas físicas com foco em robustez:
+- **Steinhart-Hart e Guards Matemáticos:** Conversão precisa para temperatura em Celsius. Foram implementados "Guards" que impedem divisões por zero e erros de logaritmo caso os sensores atinjam saturação máxima ou mínima (0 ou 4095 no ADC), garantindo que o sistema não trave em condições extremas.
+- **Conversão Lux:** Cálculo logarítmico para luminosidade real calibrado para o sensor LDR.
+- **Média Móvel:** Filtra ruídos elétricos, garantindo que a lógica de decisão seja baseada em dados estáveis e não em picos transitórios.
+- **Tratamento de Saturação de ADC:** O firmware limita via software os valores de entrada do ADC antes do processamento, assegurando a estabilidade operacional mesmo em caso de falha de hardware ou desconexão física de sensores.
+
+---
+
+## 5. Como Executar e Testar
+
+### Geração do Filesystem (Local)
+Para gerar o arquivo `fs.bin` necessário para a simulação local no VS Code utilizando Docker (PowerShell):
+
+```powershell
+docker build -t esp32-builder -f Dockerfile . ;
+docker create --name esp32-fs-builder esp32-builder ;
+docker cp esp32-fs-builder:/fs.bin . ;
+docker rm esp32-fs-builder
 ```
 
-#### 🔹 Opção B – Dev Container (Recomendado)
-
-Este repositório inclui um Dev Container, garantindo um ambiente padronizado.
-
-**Requisitos:**
-
-- VS Code
-- Docker instalado
-- Extensão Dev Containers
-
-**Passos:**
-
-1. Abra o repositório no VS Code
-2. Clique em “Reopen in Container”
-3. Aguarde a criação automática do ambiente
-
-> ➡️ Todas as dependências serão instaladas automaticamente.
-
-## 🔐 Passo 2 – Criando sua API Key do Wokwi
-
-A simulação do projeto será executada automaticamente via GitHub Actions, utilizando o Wokwi CLI.
-
-Para isso, você precisa gerar uma API Key.
-
-1. Acesse: https://wokwi.com/dashboard/ci
-2. Faça login (Google ou GitHub)
-3. Clique em Generate API Token
-4. Copie a chave gerada (exemplo: wokwi-xxxxxxxx)
-
->⚠️ Importante
-- Nunca faça commit dessa chave
-- Ela deve ser armazenada apenas como secret no GitHub
-
-## 🔒 Passo 3 – Configurando a API Key no GitHub (Secrets)
-
-**No repositório do seu Fork:**
-
-1. Vá em Settings
-2. Acesse Secrets and variables → Actions
-3. Clique em New repository secret
-4. Nome: WOKWI_API_KEY
-5. Valor: sua chave gerada
-6. Salve
-
-> ✔️ As GitHub Actions do template já estão preparadas para usar essa variável automaticamente.
-
-## 🧠 Passo 4 – Desafio Técnico
-
-Você deverá desenvolver um projeto de sistemas embarcados simulados, utilizando Python e Wokwi.
-
-### 📁 Estrutura mínima esperada
-
-```text
-/project
- ├── src/
- │   └── main.py        # Código principal do projeto
- ├── wokwi.toml         # Configuração da simulação
- ├── diagram.json       # Circuito no Wokwi
- └── README.md          # Explicação do seu projeto
-```
-
-> Você pode expandir essa estrutura se desejar, desde que mantenha os arquivos essenciais.
-
-### 🛠 Como Desenvolver seu Projeto
-
-O desenvolvimento acontece principalmente nos arquivos abaixo:
-
-#### 1️⃣ src/main.py
-
-- Código Python executado na simulação
-- Implementa a lógica do sistema embarcado
-- Exemplos: controle de LEDs, leitura de sensores, estados, temporizações, etc.
-
-#### 2️⃣ diagram.json
-
-- Define o hardware virtual do projeto
-- Componentes como:
-  - LEDs
-  - Botões
-  - Sensores
-  - Placa microcontroladora
-
-#### 3️⃣ wokwi.toml
-
-- Configura a simulação:
-  - Tipo de placa
-  - Framework
-  - Dependências adicionais
-
-#### 4️⃣ Commit e Push
-
-Após suas alterações:
-
-```bash
-git add .
-git commit -m "Descrição clara do que foi feito"
-git push
-```
-### ⚙ Execução Automática (GitHub Actions)
-
-A cada push, o GitHub Actions irá automaticamente:
-
-- Executar o pipeline de build
-- Rodar a simulação via Wokwi CLI
-- Validar que o projeto executa sem erros
-
-### 📌 Caso algo falhe:
-
-- Vá até a aba Actions
-- Analise os logs da execução
-- Corrija e envie novamente
-
-## 📊 Critérios de Avaliação
-
-Esta etapa será avaliada considerando:
-
-- Funcionamento correto da simulação
-- Código organizado e legível
-- Estrutura de arquivos correta
-- Uso adequado do Wokwi
-- Commits claros e bem descritos
-- Projeto executando sem falhas nas Actions
+### Simulação Interativa
+1. Abra o arquivo `diagram.json`.
+2. Inicie o simulador Wokwi no VS Code.
+3. **Teste de Desperdício:** Com o PIR em "No Motion", reduza a temperatura no NTC para menos de 23°C. O LED Vermelho deve começar a piscar rapidamente.
+4. **Teste de Histerese:** Aumente a temperatura para 24°C; o alerta deve persistir, cessando apenas ao ultrapassar 25°C.
 
 ---
 
-## 📎 Submissão Final
+## 6. Resultados e Limitações
 
-Após concluir o desenvolvimento:
+### Resultados Alcançados
+- **Autonomia Total:** Lógica de decisão 100% local no nó de borda.
+- **Eficiência de Código:** Execução multitarefa sem dependência de bibliotecas externas complexas.
+- **Auditabilidade:** Logs JSON estruturados facilitam a integração com brokers MQTT ou bancos de dados.
 
-1. Verifique se o projeto **executa sem erros** nas GitHub Actions  
-2. Confirme que todos os arquivos obrigatórios estão presentes  
-3. Copie o link do **seu repositório no GitHub**
-
-📤 Envie o link conforme as orientações do processo seletivo na plataforma **Moodle**.
-
----
-
-## 📝 Relatório do Candidato
-
-O arquivo **`README.md` do seu repositório** deve ser utilizado como o  
-**relatório final do desafio técnico**.
-
-Preencha todas as seções abaixo de forma **clara, objetiva e técnica**.
-
-> 💡 **Dica importante**  
-> Não é necessário um relatório extenso.  
-> O principal critério é demonstrar **clareza nas decisões técnicas**, organização e entendimento do sistema embarcado desenvolvido.
+### Trade-offs e Limitações Honestas
+- **Ruído em Hardware Real:** Embora a média móvel funcione bem na simulação, hardware real pode apresentar ruídos que exigiriam janelas de filtragem maiores.
+- **Sincronização Temporal:** O timestamp (`ts`) no log é relativo ao boot. Em uma implementação de produção, seria necessário um servidor NTP ou um módulo RTC para obter o horário real.
+- **Consumo de Energia:** O sistema de pisca-pisca contínuo em estados de alerta consome ciclos de CPU, o que foi um tradeoff aceito em favor da clareza visual.
 
 ---
 
-### 👤 Identificação do Candidato
+## Conclusão
 
-- **Nome completo:**  
-- **GitHub:**  
-
----
-
-## 1️⃣ Visão Geral da Solução
-
-Descreva, em poucas palavras:
-
-- Qual é o objetivo do seu projeto  
-- O que o sistema embarcado simulado faz  
-- Como o usuário interage com ele (se aplicável)
-
----
-
-## 2️⃣ Arquitetura do Sistema Embarcado
-
-Explique a arquitetura lógica do seu projeto, abordando:
-
-- Fluxo principal do programa (`main.py`)  
-- Estrutura de estados, loops ou temporizações  
-- Como os componentes interagem entre si  
-
-Se desejar, utilize tópicos ou um pequeno diagrama em texto.
-
----
-
-## 3️⃣ Componentes Utilizados na Simulação
-
-Liste os principais componentes definidos no `diagram.json`, por exemplo:
-
-- Tipo de placa utilizada  
-- LEDs, botões, sensores, atuadores, etc.  
-- Função de cada componente no sistema  
-
----
-
-## 4️⃣ Decisões Técnicas Relevantes
-
-Explique brevemente decisões importantes tomadas durante o desenvolvimento, como:
-
-- Organização do código  
-- Uso de funções, estados ou constantes  
-- Estratégias para temporização ou controle lógico  
-
----
-
-## 5️⃣ Resultados Obtidos
-
-Descreva o comportamento final do sistema:
-
-- O que funciona corretamente  
-- Quais requisitos foram atendidos  
-- Resultado observado na simulação do Wokwi  
-
----
-
-## 6️⃣ Comentários Adicionais (Opcional)
-
-Utilize este espaço para comentar, se desejar:
-
-- Dificuldades encontradas  
-- Limitações da solução  
-- Melhorias que você faria com mais tempo  
-- Principais aprendizados durante o desafio  
-
----
-
-> ✅ Este relatório faz parte da avaliação técnica.  
-> Clareza, objetividade e organização são tão importantes quanto o funcionamento do código.
-
----
-
-## 🆘 Suporte
-
-Em caso de dúvidas:
-
-- Consulte o material dos cursos EAD
-- Leia atentamente este README
-- Analise os logs das GitHub Actions
-- Utilize os canais oficiais para contato com os instrutores
-
-Boa sorte no processo seletivo.
-Mostre sua capacidade de pensar como um engenheiro de sistemas embarcados.
-****
+O **SmartRoom Monitor** demonstra que é possível implementar inteligência de detecção e controle robusto em hardware limitado. A adoção de técnicas de sistemas de tempo real, como loops não-bloqueantes e bandas de histerese, garante que o dispositivo atue de forma confiável na preservação de recursos energéticos, cumprindo rigorosamente os objetivos do desafio técnico.
