@@ -28,7 +28,7 @@ Diferente de sistemas que apenas reportam dados, o SmartRoom Monitor processa a 
 
 O firmware utiliza uma arquitetura baseada em camadas para garantir modularidade e facilitar a calibração individual de cada sensor:
 
-```
+```text
 ┌───────────────────────────────────────────────┐
 │         Camada de Apresentação                │
 │  (Monitor Serial - Logs estruturados em JSON) │
@@ -59,17 +59,17 @@ O firmware utiliza uma arquitetura baseada em camadas para garantir modularidade
 
 ### Dinâmica de Funcionamento
 
-1.  **Percepção:** Coleta contínua de dados analógicos com resolução de 12 bits e sinais digitais.
-2.  **Processamento:** Os dados brutos passam por um filtro de média móvel (janela de 10 amostras). A presença é validada por um latch que mantém o estado "ocupado" por 30 segundos após o último movimento detectado pelo sensor PIR.
-3.  **Decisão:** Uma máquina de estados aplica limiares com histerese para evitar oscilações rápidas (chattering) nos atuadores.
-4.  **Atuação:** Resposta visual imediata. Os LEDs piscam em frequências distintas conforme a gravidade: Crítico (200ms) e Aviso (600ms).
+1. **Percepção:** Coleta contínua de dados analógicos com resolução de 12 bits e sinais digitais.
+2. **Processamento:** Os dados brutos passam por um filtro de média móvel (janela de 10 amostras). A presença é validada por um latch que mantém o estado "ocupado" por 30 segundos após o último movimento detectado pelo sensor PIR.
+3. **Decisão:** Uma máquina de estados aplica limiares com histerese para evitar oscilações rápidas (chattering) nos atuadores.
+4. **Atuação:** Resposta visual imediata. Os LEDs piscam em frequências distintas conforme a gravidade: Crítico (200ms) e Aviso (600ms).
 
 ---
 
 ## 3. Hardware e Componentes
 
 | Componente | Especificação | Função |
-|---|---|---|
+| --- | --- | --- |
 | **MCU** | ESP32-DevKit-C-V4 | Processador principal |
 | **Sensor NTC** | Analógico (GPIO 34) | Medição de temperatura (Equação Steinhart-Hart) |
 | **Sensor LDR** | Analógico (GPIO 35) | Medição de luminosidade (Lux) |
@@ -82,18 +82,24 @@ O firmware utiliza uma arquitetura baseada em camadas para garantir modularidade
 ## 4. Decisões Técnicas Relevantes
 
 ### 4.1 Temporização Não-Bloqueante e Robustez de Tempo
+
 O uso de `time.sleep()` foi totalmente banido em favor de uma estrutura baseada em `time.ticks_ms()` e `time.ticks_diff()`.
+
 - **Prevenção de Overflow:** O uso de `time.ticks_diff()` é uma decisão crítica de engenharia que garante que o cálculo de intervalos permaneça correto mesmo após o rollover (estouro) do contador de milissegundos do hardware, permitindo operação contínua de longo prazo.
 - **Multitarefa Cooperativa:** Essa abordagem permite que o sistema processe sensores a 10Hz, emita logs a 1Hz e gerencie o pisca-pisca dos LEDs simultaneamente, mantendo a responsividade total.
 
 ### 4.2 Robustez com Histerese e Latch de Presença
+
 Para evitar alarmes falsos e instabilidade operacional:
+
 - **Histerese:** Foram definidos thresholds de entrada e saída distintos. O alerta de climatização, por exemplo, é ativado em 23°C, mas só é desativado quando a temperatura sobe acima de 25°C.
 - **Latch de PIR e Inicialização Segura:** Sensores PIR detectam movimento, não presença estática. O firmware implementa um timeout de 30 segundos de persistência.
 - **Prevenção de Falso Positivo no Boot:** O estado de presença é inicializado via software como "expirado" (fora do intervalo de timeout), garantindo que o sistema comece corretamente em estado desocupado e não gere alertas falsos nos primeiros 30 segundos após a inicialização.
 
 ### 4.3 Matemática Embarcada e Proteção de Operações
+
 O firmware realiza o processamento real das grandezas físicas com foco em robustez:
+
 - **Steinhart-Hart e Guards Matemáticos:** Conversão precisa para temperatura em Celsius. Foram implementados "Guards" que impedem divisões por zero e erros de logaritmo caso os sensores atinjam saturação máxima ou mínima (0 ou 4095 no ADC), garantindo que o sistema não trave em condições extremas.
 - **Conversão Lux:** Cálculo logarítmico para luminosidade real calibrado para o sensor LDR.
 - **Média Móvel:** Filtra ruídos elétricos, garantindo que a lógica de decisão seja baseada em dados estáveis e não em picos transitórios.
@@ -104,6 +110,7 @@ O firmware realiza o processamento real das grandezas físicas com foco em robus
 ## 5. Como Executar e Testar
 
 ### Geração do Filesystem (Local)
+
 Para gerar o arquivo `fs.bin` necessário para a simulação local no VS Code utilizando Docker (PowerShell):
 
 ```powershell
@@ -114,6 +121,7 @@ docker rm esp32-fs-builder
 ```
 
 ### Simulação Interativa
+
 1. Abra o arquivo `diagram.json`.
 2. Inicie o simulador Wokwi no VS Code.
 3. **Teste de Desperdício:** Com o PIR em "No Motion", reduza a temperatura no NTC para menos de 23°C. O LED Vermelho deve começar a piscar rapidamente.
@@ -124,11 +132,13 @@ docker rm esp32-fs-builder
 ## 6. Resultados e Limitações
 
 ### Resultados Alcançados
+
 - **Autonomia Total:** Lógica de decisão 100% local no nó de borda.
 - **Eficiência de Código:** Execução multitarefa sem dependência de bibliotecas externas complexas.
 - **Auditabilidade:** Logs JSON estruturados facilitam a integração com brokers MQTT ou bancos de dados.
 
 ### Trade-offs e Limitações Honestas
+
 - **Ruído em Hardware Real:** Embora a média móvel funcione bem na simulação, hardware real pode apresentar ruídos que exigiriam janelas de filtragem maiores.
 - **Sincronização Temporal:** O timestamp (`ts`) no log é relativo ao boot. Em uma implementação de produção, seria necessário um servidor NTP ou um módulo RTC para obter o horário real.
 - **Consumo de Energia:** O sistema de pisca-pisca contínuo em estados de alerta consome ciclos de CPU, o que foi um tradeoff aceito em favor da clareza visual.
