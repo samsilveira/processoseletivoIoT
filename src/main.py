@@ -46,7 +46,7 @@ buffers = {"temp": [], "lux": [], "pwr": []}
 last_sample_time   = 0
 last_log_time      = 0
 last_blink_time    = 0
-last_presence_time = 0
+last_presence_time = -30001 # Inicializa como expirado para evitar presenca no boot
 blink_led_state    = False
 
 # Inicializacao de Variaveis de Estado (Evita NameError)
@@ -88,7 +88,8 @@ def update_presence(raw_pir, current_ms):
     global last_presence_time
     if raw_pir == 1:
         last_presence_time = current_ms
-    return (current_ms - last_presence_time) < PRESENCE_TIMEOUT_MS
+    # Uso de ticks_diff para seguranca de tempo real
+    return time.ticks_diff(current_ms, last_presence_time) < PRESENCE_TIMEOUT_MS
 
 # Atuacao e Feedback Visual
 
@@ -97,7 +98,8 @@ def update_visuals(state, current_ms):
 
     blink_interval = 200 if state == "CRITICO" else 600
 
-    if current_ms - last_blink_time >= blink_interval:
+    # Uso de ticks_diff para gerenciar o pisca-pisca
+    if time.ticks_diff(current_ms, last_blink_time) >= blink_interval:
         blink_led_state = not blink_led_state
         last_blink_time = current_ms
 
@@ -141,13 +143,13 @@ def evaluate(t, l, pres, p, prev_state):
 
 print("Teste")
 print("--- SmartRoom Monitor ---")
-print("\tIniciando Auditoria Energetica...")
+print("[Iniciando Auditoria Energetica...]")
 
 while True:
     current_ms = time.ticks_ms()
 
     # Tarefa 1: Amostragem e Processamento (100ms)
-    if current_ms - last_sample_time >= sample_interval:
+    if time.ticks_diff(current_ms, last_sample_time) >= sample_interval:
         last_sample_time = current_ms
 
         # Leitura e Suavizacao
@@ -168,7 +170,7 @@ while True:
     update_visuals(current_state, current_ms)
 
     # Tarefa 3: Log Serial (1000ms)
-    if current_ms - last_log_time >= log_interval:
+    if time.ticks_diff(current_ms, last_log_time) >= log_interval:
         last_log_time = current_ms
         print('{"ts":%d, "state":"%s", "temp":%.1f, "lux":%.1f, "presence":%d, "pwr":%.1f}' %
               (current_ms, current_state, temp, lux, 1 if presence else 0, pwr))
