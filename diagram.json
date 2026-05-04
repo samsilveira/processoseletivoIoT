@@ -94,11 +94,27 @@
       "top": 9.6,
       "left": 499.2,
       "attrs": { "text": "Consumo (Simulado)" }
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btn_mode",
+      "top": 265.4,
+      "left": 460.8,
+      "attrs": { "color": "blue", "label": "Modo" }
+    },
+    {
+      "type": "wokwi-text",
+      "id": "text_btn",
+      "top": 325,
+      "left": 430,
+      "attrs": { "text": "Rigoroso / Padrão" }
     }
   ],
   "connections": [
     [ "esp:TX", "$serialMonitor:RX", "", [] ],
     [ "esp:RX", "$serialMonitor:TX", "", [] ],
+    [ "esp:12", "btn_mode:1.l", "blue", [ "h14.59", "v48", "h422.4", "v86.4" ] ],
+    [ "btn_mode:2.l", "esp:GND.3", "black", [ "h-9.6", "v-105.4", "h-297.6", "v-105.6" ] ],
     [ "esp:GND.3", "ntc1:GND", "black", [ "h24.04", "v105.6", "h124.8" ] ],
     [ "esp:3V3", "ntc1:VCC", "red", [ "h-14.21", "v192", "h192", "v-86.4" ] ],
     [ "ntc1:OUT", "esp:34", "blue", [ "h0.1", "v28.8", "h-96", "v-96" ] ],

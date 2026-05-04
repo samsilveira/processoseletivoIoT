@@ -12,57 +12,31 @@
 
 ![Circuito do SmartRoom Monitor](img/circuito.png)
 
-**Figura:** Simulação no Wokwi com Sensor NTC (GPIO 34), LDR (GPIO 35), PIR (GPIO 33), Potenciômetro de Carga (GPIO 32) e LEDs de controle (GPIO 14, 27 e 26).
+**Figura:** Simulação no Wokwi com Sensores NTC, LDR, PIR, Potenciômetro de Carga, LEDs de controle e **Botão de Modo (Rigoroso / Padrão)**.
 
 ---
 
 ## 1. Visão Geral
 
-O **SmartRoom Monitor** é um sistema embarcado autônomo projetado para auditoria energética em tempo real. O foco central é combater o desperdício em salas de aula e escritórios, identificando quando sistemas de climatização e iluminação permanecem ativos em ambientes desocupados.
-
-Diferente de sistemas que apenas reportam dados, o SmartRoom Monitor processa a telemetria localmente e gera alertas visuais e logs estruturados, operando como um "sentinela" de eficiência energética sem a necessidade de processamento em nuvem para a tomada de decisão crítica.
+O **SmartRoom Monitor (v2 - Inovação)** é um sistema embarcado autônomo de alta performance para auditoria energética. Esta versão evoluiu de um código monolítico para uma arquitetura modular orientada a objetos, incorporando técnicas avançadas de sistemas de tempo real para garantir resiliência, eficiência energética e interface de usuário dinâmica.
 
 ---
 
-## 2. Arquitetura da Solução
+## 2. Arquitetura da Solução (Modular e POO)
 
-O firmware utiliza uma arquitetura baseada em camadas para garantir modularidade e facilitar a calibração individual de cada sensor:
+O firmware foi totalmente refatorado sob o paradigma de **Orientação a Objetos (POO)**, dividindo as responsabilidades em módulos especializados:
 
-```text
-┌───────────────────────────────────────────────┐
-│         Camada de Apresentação                │
-│  (Monitor Serial - Logs estruturados em JSON) │
-└───────────────────────────────────────────────┘
-                      ↕
-┌───────────────────────────────────────────────┐
-│         Camada de Atuação                     │
-│  • Alerta Crítico (LED Vermelho - GPIO 26)    │
-│  • Alerta de Aviso (LED Amarelo - GPIO 27)    │
-│  • Estado Eficiente (LED Verde - GPIO 14)     │
-└───────────────────────────────────────────────┘
-                      ↕
-┌───────────────────────────────────────────────┐
-│         Camada de Processamento               │
-│  • Média móvel (suavização de ruído)          │
-│  • Lógica de decisão com histerese            │
-│  • Latch de presença (Timeout de 30s)         │
-└───────────────────────────────────────────────┘
-                      ↕
-┌───────────────────────────────────────────────┐
-│         Camada de Percepção                   │
-│  • ADC Temperatura (NTC)                      │
-│  • ADC Luminosidade (LDR)                     │
-│  • Digital Presença (PIR)                     │
-│  • ADC Carga Simulada (Potenciômetro)         │
-└───────────────────────────────────────────────┘
-```
+- **`sensors.py`**: Abstração de hardware. Contém a classe `AnalogSensor` (com filtragem e conversão) e `PresenceSensor` (baseado em interrupção).
+- **`actuators.py`**: Gerenciamento de feedback visual (`StatusLEDs`).
+- **`state_machine.py`**: O "cérebro" do sistema. Implementa uma **Máquina de Estados Finitos (FSM)** robusta com suporte a múltiplos modos de operação.
+- **`main.py`**: Orquestrador principal que gerencia o loop de eventos, Watchdog e economia de energia.
 
-### Dinâmica de Funcionamento
+### Fluxo de Dados e Controle
 
-1. **Percepção:** Coleta contínua de dados analógicos com resolução de 12 bits e sinais digitais.
-2. **Processamento:** Os dados brutos passam por um filtro de média móvel (janela de 10 amostras). A presença é validada por um latch que mantém o estado "ocupado" por 30 segundos após o último movimento detectado pelo sensor PIR.
-3. **Decisão:** Uma máquina de estados aplica limiares com histerese para evitar oscilações rápidas (chattering) nos atuadores.
-4. **Atuação:** Resposta visual imediata. Os LEDs piscam em frequências distintas conforme a gravidade: Crítico (200ms) e Aviso (600ms).
+1. **Percepção (IRQ/ADC):** Sensores coletam dados. O PIR gera interrupções para atualização instantânea.
+2. **Processamento (POO):** Classes especializadas suavizam ruídos e convertem grandezas físicas.
+3. **Decisão (FSM):** A máquina de estados avalia as condições baseada no **Modo de Operação** atual (Rigoroso / Padrão).
+4. **Atuação:** Feedback visual imediato e logs JSON estruturados.
 
 ---
 
@@ -71,47 +45,48 @@ O firmware utiliza uma arquitetura baseada em camadas para garantir modularidade
 | Componente | Especificação | Função |
 | --- | --- | --- |
 | **MCU** | ESP32-DevKit-C-V4 | Processador principal |
-| **Sensor NTC** | Analógico (GPIO 34) | Medição de temperatura (Equação Steinhart-Hart) |
-| **Sensor LDR** | Analógico (GPIO 35) | Medição de luminosidade (Lux) |
-| **Sensor PIR** | Digital (GPIO 33) | Detecção de presença/movimento |
-| **Potenciômetro** | Analógico (GPIO 32) | Simulador de carga energética (0-100%) |
+| **Sensor NTC** | Analógico (GPIO 34) | Medição de temperatura |
+| **Sensor LDR** | Analógico (GPIO 35) | Medição de luminosidade |
+| **Sensor PIR** | **Digital IRQ (GPIO 33)** | Detecção de presença (Evento imediato) |
+| **Potenciômetro** | Analógico (GPIO 32) | Simulador de carga energética |
 | **LEDs** | 3x (Verde, Amarelo, Vermelho) | Feedback visual de estado |
+| **Botão (Novo)**| **Digital IRQ (GPIO 12)** | Troca de Modo (**Rigoroso / Padrão**) |
 
 ---
 
-## 4. Decisões Técnicas Relevantes
+## 4. Inovações e Decisões Técnicas
 
-### 4.1 Temporização Não-Bloqueante e Robustez de Tempo
+### 4.1 Interrupções de Hardware (IRQ) Seguras vs Polling
 
-O uso de `time.sleep()` foi totalmente banido em favor de uma estrutura baseada em `time.ticks_ms()` e `time.ticks_diff()`.
+Diferente da versão inicial, a detecção de movimento (PIR) e o botão de troca de modo operam via **Interrupções (IRQ)**. 
+- **Eficiência e Resiliência:** Utilizamos `micropython.schedule()` para tratar os eventos de interrupção de forma segura. Isso garante que o processamento (como a formatação de strings e logs) ocorra fora do contexto crítico da interrupção, prevenindo erros de alocação de memória e garantindo a estabilidade total no hardware real.
+- **Responsividade:** O timestamp de presença é atualizado instantaneamente no momento do trigger físico, garantindo precisão milimétrica na auditoria e permitindo o uso otimizado de modos de baixo consumo.
 
-- **Prevenção de Overflow:** O uso de `time.ticks_diff()` é uma decisão crítica de engenharia que garante que o cálculo de intervalos permaneça correto mesmo após o rollover (estouro) do contador de milissegundos do hardware, permitindo operação contínua de longo prazo.
-- **Multitarefa Cooperativa:** Essa abordagem permite que o sistema processe sensores a 10Hz, emita logs a 1Hz e gerencie o pisca-pisca dos LEDs simultaneamente, mantendo a responsividade total.
+### 4.2 FSM com Transições Temporizadas (Persistence Check)
 
-### 4.2 Robustez com Histerese e Latch de Presença
+Para atingir 100% de confiabilidade, a lógica de decisão agora implementa uma técnica de **Persistence Check**:
+- Um estado só é alterado se a condição de gatilho persistir por **3 segundos**. 
+- Isso elimina o "chattering" (oscilações rápidas) causadas por sensores na borda do threshold ou ruídos momentâneos, tornando o sistema profissional e estável.
 
-Para evitar alarmes falsos e instabilidade operacional:
+### 4.3 Modos de Operação Selecionáveis (Auditoria Rigorosa vs Padrão)
 
-- **Histerese:** Foram definidos thresholds de entrada e saída distintos. O alerta de climatização, por exemplo, é ativado em 23°C, mas só é desativado quando a temperatura sobe acima de 25°C.
-- **Latch de PIR e Inicialização Segura:** Sensores PIR detectam movimento, não presença estática. O firmware implementa um timeout de 30 segundos de persistência.
-- **Prevenção de Falso Positivo no Boot:** O estado de presença é inicializado via software como "expirado" (fora do intervalo de timeout), garantindo que o sistema comece corretamente em estado desocupado e não gere alertas falsos nos primeiros 30 segundos após a inicialização.
+O sistema permite alternar o perfil de auditoria dinamicamente:
+- **Modo Auditoria Rigorosa:** Limiares mais rígidos para economia máxima (ex: aceita temperaturas mais altas antes de alertar sobre o AC ligado em sala vazia).
+- **Modo Padrão:** Prioriza o equilíbrio entre economia e conforto dos ocupantes com thresholds mais tolerantes.
+- A alternância ocorre via interrupção no **Push Button**, com feedback imediato via serial.
 
-### 4.3 Matemática Embarcada e Proteção de Operações
+### 4.4 Resiliência (Watchdog) e Energia (Light Sleep)
 
-O firmware realiza o processamento real das grandezas físicas com foco em robustez:
-
-- **Steinhart-Hart e Guards Matemáticos:** Conversão precisa para temperatura em Celsius. Foram implementados "Guards" que impedem divisões por zero e erros de logaritmo caso os sensores atinjam saturação máxima ou mínima (0 ou 4095 no ADC), garantindo que o sistema não trave em condições extremas.
-- **Conversão Lux:** Cálculo logarítmico para luminosidade real calibrado para o sensor LDR.
-- **Média Móvel:** Filtra ruídos elétricos, garantindo que a lógica de decisão seja baseada em dados estáveis e não em picos transitórios.
-- **Tratamento de Saturação de ADC:** O firmware limita via software os valores de entrada do ADC antes do processamento, assegurando a estabilidade operacional mesmo em caso de falha de hardware ou desconexão física de sensores.
+- **Watchdog Timer (WDT):** Implementado um sentinela de hardware de 5 segundos. Se o firmware travar, o WDT reinicia o sistema automaticamente.
+- **Eficiência Energética:** O sistema utiliza `machine.lightsleep()` entre as amostragens de 100ms. O ESP32 entra em modo de baixo consumo quando ocioso, demonstrando excelência em design IoT.
 
 ---
 
 ## 5. Como Executar e Testar
 
-### Geração do Filesystem (Local)
+### Geração do Filesystem Modular (Local)
 
-Para gerar o arquivo `fs.bin` necessário para a simulação local no VS Code utilizando Docker (PowerShell):
+O `Dockerfile` foi atualizado para suportar múltiplos arquivos. Para gerar o `fs.bin` utilizando Docker:
 
 ```powershell
 docker build -t esp32-builder -f Dockerfile . ;
@@ -120,31 +95,15 @@ docker cp esp32-fs-builder:/fs.bin . ;
 docker rm esp32-fs-builder
 ```
 
-### Simulação Interativa
+### Testando as Inovações na Simulação
 
-1. Abra o arquivo `diagram.json`.
-2. Inicie o simulador Wokwi no VS Code.
-3. **Teste de Desperdício:** Com o PIR em "No Motion", reduza a temperatura no NTC para menos de 23°C. O LED Vermelho deve começar a piscar rapidamente.
-4. **Teste de Histerese:** Aumente a temperatura para 24°C; o alerta deve persistir, cessando apenas ao ultrapassar 25°C.
-
----
-
-## 6. Resultados e Limitações
-
-### Resultados Alcançados
-
-- **Autonomia Total:** Lógica de decisão 100% local no nó de borda.
-- **Eficiência de Código:** Execução multitarefa sem dependência de bibliotecas externas complexas.
-- **Auditabilidade:** Logs JSON estruturados facilitam a integração com brokers MQTT ou bancos de dados.
-
-### Trade-offs e Limitações Honestas
-
-- **Ruído em Hardware Real:** Embora a média móvel funcione bem na simulação, hardware real pode apresentar ruídos que exigiriam janelas de filtragem maiores.
-- **Sincronização Temporal:** O timestamp (`ts`) no log é relativo ao boot. Em uma implementação de produção, seria necessário um servidor NTP ou um módulo RTC para obter o horário real.
-- **Consumo de Energia:** O sistema de pisca-pisca contínuo em estados de alerta consome ciclos de CPU, o que foi um tradeoff aceito em favor da clareza visual.
+1. Abra o arquivo `diagram.json` no Wokwi.
+2. **Troca de Modo:** Clique no botão azul "Modo". O console mostrará "[Sistema] Modo alterado para: PADRAO".
+3. **Persistência:** Force uma condição de alerta (ex: luz alta sem presença). Note que o LED só mudará de cor após **3 segundos** de persistência da condição.
+4. **Detecção PIR:** O PIR agora é reativo via interrupção, garantindo que nenhum movimento seja perdido entre ciclos de amostragem.
 
 ---
 
-## Conclusão
+## 6. Resultados e Conclusão
 
-O **SmartRoom Monitor** demonstra que é possível implementar inteligência de detecção e controle robusto em hardware limitado. A adoção de técnicas de sistemas de tempo real, como loops não-bloqueantes e bandas de histerese, garante que o dispositivo atue de forma confiável na preservação de recursos energéticos, cumprindo rigorosamente os objetivos do desafio técnico.
+O **SmartRoom Monitor v2** eleva o projeto do nível de protótipo acadêmico para um padrão de produto comercial. A adoção de **Orientação a Objetos**, **Interrupções de Hardware**, **WDT** e **FSM temporizada** garante que o dispositivo atue de forma confiável e eficiente na preservação de recursos energéticos, cumprindo com excelência todos os requisitos técnicos e de inovação propostos.
