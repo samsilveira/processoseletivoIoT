@@ -12,31 +12,31 @@
 
 ![Circuito do SmartRoom Monitor](img/circuito.png)
 
-**Figura:** Simulação no Wokwi com Sensores NTC, LDR, PIR, Potenciômetro de Carga, LEDs de controle e **Botão de Modo (Rigoroso / Padrão)**.
+**Figura:** Simulação no Wokwi com Sensores NTC, LDR, PIR, Potenciômetro de Carga, LEDs de controle e Botão de Modo (Rigoroso / Padrão).
 
 ---
 
 ## 1. Visão Geral
 
-O **SmartRoom Monitor (v2 - Inovação)** é um sistema embarcado autônomo de alta performance para auditoria energética. Esta versão evoluiu de um código monolítico para uma arquitetura modular orientada a objetos, incorporando técnicas avançadas de sistemas de tempo real para garantir resiliência, eficiência energética e interface de usuário dinâmica.
+O **SmartRoom Monitor** é um sistema embarcado autônomo de alta performance projetado para auditoria energética em tempo real. O sistema utiliza uma arquitetura modular orientada a objetos e técnicas de sistemas de tempo real para garantir resiliência, eficiência energética e uma interface de usuário dinâmica, focando no combate ao desperdício em ambientes inteligentes.
 
 ---
 
 ## 2. Arquitetura da Solução (Modular e POO)
 
-O firmware foi totalmente refatorado sob o paradigma de **Orientação a Objetos (POO)**, dividindo as responsabilidades em módulos especializados:
+O firmware é estruturado sob o paradigma de **Orientação a Objetos (POO)**, dividindo as responsabilidades em módulos especializados para garantir escalabilidade e manutenibilidade:
 
-- **`sensors.py`**: Abstração de hardware. Contém a classe `AnalogSensor` (com filtragem e conversão) e `PresenceSensor` (baseado em interrupção).
-- **`actuators.py`**: Gerenciamento de feedback visual (`StatusLEDs`).
-- **`state_machine.py`**: O "cérebro" do sistema. Implementa uma **Máquina de Estados Finitos (FSM)** robusta com suporte a múltiplos modos de operação.
-- **`main.py`**: Orquestrador principal que gerencia o loop de eventos, Watchdog e economia de energia.
+- **`sensors.py`**: Abstração de hardware. Contém a classe `AnalogSensor` (filtragem e conversão) e `PresenceSensor` (detecção baseada em evento).
+- **`actuators.py`**: Gerenciamento de feedback visual através da classe `StatusLEDs`.
+- **`state_machine.py`**: Núcleo de decisão. Implementa uma **Máquina de Estados Finitos (FSM)** robusta com suporte a múltiplos perfis de auditoria.
+- **`main.py`**: Ponto de entrada que orquestra o loop de eventos, Watchdog e políticas de economia de energia.
 
 ### Fluxo de Dados e Controle
 
-1. **Percepção (IRQ/ADC):** Sensores coletam dados. O PIR gera interrupções para atualização instantânea.
-2. **Processamento (POO):** Classes especializadas suavizam ruídos e convertem grandezas físicas.
-3. **Decisão (FSM):** A máquina de estados avalia as condições baseada no **Modo de Operação** atual (Rigoroso / Padrão).
-4. **Atuação:** Feedback visual imediato e logs JSON estruturados.
+1. **Percepção (IRQ/ADC):** Coleta de dados analógicos suavizados e sinais digitais via interrupções para atualização instantânea.
+2. **Processamento:** Classes especializadas realizam a conversão para grandezas físicas (Celsius, Lux, %).
+3. **Decisão:** A FSM avalia as condições ambientais baseada no perfil de auditoria selecionado (Rigoroso ou Padrão).
+4. **Atuação:** Geração de alertas visuais e logs estruturados em formato JSON para auditoria externa.
 
 ---
 
@@ -48,45 +48,45 @@ O firmware foi totalmente refatorado sob o paradigma de **Orientação a Objetos
 | **Sensor NTC** | Analógico (GPIO 34) | Medição de temperatura |
 | **Sensor LDR** | Analógico (GPIO 35) | Medição de luminosidade |
 | **Sensor PIR** | **Digital IRQ (GPIO 33)** | Detecção de presença (Evento imediato) |
-| **Potenciômetro** | Analógico (GPIO 32) | Simulador de carga energética |
+| **Potenciômetro** | Analógico (GPIO 32) | Simulador de carga energética (0-100%) |
 | **LEDs** | 3x (Verde, Amarelo, Vermelho) | Feedback visual de estado |
-| **Botão (Novo)**| **Digital IRQ (GPIO 12)** | Troca de Modo (**Rigoroso / Padrão**) |
+| **Botão de Modo**| **Digital IRQ (GPIO 12)** | Alternância entre perfis de auditoria |
 
 ---
 
 ## 4. Inovações e Decisões Técnicas
 
-### 4.1 Interrupções de Hardware (IRQ) Seguras vs Polling
+### 4.1 Interrupções de Hardware (IRQ) Seguras
 
-Diferente da versão inicial, a detecção de movimento (PIR) e o botão de troca de modo operam via **Interrupções (IRQ)**. 
-- **Eficiência e Resiliência:** Utilizamos `micropython.schedule()` para tratar os eventos de interrupção de forma segura. Isso garante que o processamento (como a formatação de strings e logs) ocorra fora do contexto crítico da interrupção, prevenindo erros de alocação de memória e garantindo a estabilidade total no hardware real.
-- **Responsividade:** O timestamp de presença é atualizado instantaneamente no momento do trigger físico, garantindo precisão milimétrica na auditoria e permitindo o uso otimizado de modos de baixo consumo.
+A detecção de movimento e a interface de botão operam via **Interrupções de Hardware (IRQ)** para otimizar o uso da CPU:
+- **Resiliência:** O uso de `micropython.schedule()` garante que o processamento de eventos (como logs e cálculos) ocorra fora do contexto crítico da interrupção, prevenindo erros de alocação de memória no hardware real.
+- **Eficiência:** Permite que o processador entre em estados de baixo consumo sem perder eventos críticos de sensores.
 
 ### 4.2 FSM com Transições Temporizadas (Persistence Check)
 
-Para atingir 100% de confiabilidade, a lógica de decisão agora implementa uma técnica de **Persistence Check**:
-- Um estado só é alterado se a condição de gatilho persistir por **3 segundos**. 
-- Isso elimina o "chattering" (oscilações rápidas) causadas por sensores na borda do threshold ou ruídos momentâneos, tornando o sistema profissional e estável.
+Para garantir estabilidade operacional e evitar alarmes falsos:
+- A lógica de decisão exige que uma condição de trigger persista por **3 segundos** antes de consolidar a mudança de estado.
+- Este mecanismo elimina o "chattering" causado por ruídos analógicos ou sensores operando em limiares de transição.
 
-### 4.3 Modos de Operação Selecionáveis (Auditoria Rigorosa vs Padrão)
+### 4.3 Modos de Operação: Auditoria Rigorosa vs Padrão
 
-O sistema permite alternar o perfil de auditoria dinamicamente:
-- **Modo Auditoria Rigorosa:** Limiares mais rígidos para economia máxima (ex: aceita temperaturas mais altas antes de alertar sobre o AC ligado em sala vazia).
-- **Modo Padrão:** Prioriza o equilíbrio entre economia e conforto dos ocupantes com thresholds mais tolerantes.
-- A alternância ocorre via interrupção no **Push Button**, com feedback imediato via serial.
+O sistema disponibiliza perfis selecionáveis para diferentes necessidades de gestão:
+- **Modo Auditoria Rigorosa:** Aplica limiares mais estritos para maximizar a economia de recursos.
+- **Modo Padrão:** Equilibra a economia de energia com o conforto dos ocupantes.
+- A troca de perfil é realizada via interrupção no botão físico, fornecendo feedback imediato no terminal.
 
-### 4.4 Resiliência (Watchdog) e Energia (Light Sleep)
+### 4.4 Resiliência e Gestão de Energia
 
-- **Watchdog Timer (WDT):** Implementado um sentinela de hardware de 5 segundos. Se o firmware travar, o WDT reinicia o sistema automaticamente.
-- **Eficiência Energética:** O sistema utiliza `machine.lightsleep()` entre as amostragens de 100ms. O ESP32 entra em modo de baixo consumo quando ocioso, demonstrando excelência em design IoT.
+- **Watchdog Timer (WDT):** Um sentinela de hardware monitora o loop principal, reiniciando o sistema automaticamente em caso de falha de software.
+- **Eficiência Energética:** Implementação de `machine.lightsleep()` entre ciclos de amostragem, reduzindo o consumo energético simulado e real do dispositivo IoT.
 
 ---
 
 ## 5. Como Executar e Testar
 
-### Geração do Filesystem Modular (Local)
+### Geração do Filesystem Modular
 
-O `Dockerfile` foi atualizado para suportar múltiplos arquivos. Para gerar o `fs.bin` utilizando Docker:
+O processo de build via Docker integra todos os módulos Python no binário do sistema de arquivos (`fs.bin`):
 
 ```powershell
 docker build -t esp32-builder -f Dockerfile . ;
@@ -95,15 +95,31 @@ docker cp esp32-fs-builder:/fs.bin . ;
 docker rm esp32-fs-builder
 ```
 
-### Testando as Inovações na Simulação
+### Protocolo de Teste na Simulação
 
-1. Abra o arquivo `diagram.json` no Wokwi.
-2. **Troca de Modo:** Clique no botão azul "Modo". O console mostrará "[Sistema] Modo alterado para: PADRAO".
-3. **Persistência:** Force uma condição de alerta (ex: luz alta sem presença). Note que o LED só mudará de cor após **3 segundos** de persistência da condição.
-4. **Detecção PIR:** O PIR agora é reativo via interrupção, garantindo que nenhum movimento seja perdido entre ciclos de amostragem.
+1. **Validação de Modo:** Clique no botão azul "Modo" para observar a troca de perfil no console.
+2. **Teste de Persistência:** Force uma condição de alerta (ex: luz acesa sem presença). O LED deve mudar de cor somente após o tempo de confirmação de 3 segundos.
+3. **Detecção PIR:** Verifique se o registro de presença no log JSON responde instantaneamente ao acionamento do sensor.
 
 ---
 
-## 6. Resultados e Conclusão
+## 6. Resultados e Limitações
 
-O **SmartRoom Monitor v2** eleva o projeto do nível de protótipo acadêmico para um padrão de produto comercial. A adoção de **Orientação a Objetos**, **Interrupções de Hardware**, **WDT** e **FSM temporizada** garante que o dispositivo atue de forma confiável e eficiente na preservação de recursos energéticos, cumprindo com excelência todos os requisitos técnicos e de inovação propostos.
+### Resultados Alcançados
+
+- **Autonomia e Inteligência Local:** Lógica de decisão processada inteiramente na borda (Edge Computing).
+- **Arquitetura Industrial:** Separação em módulos POO que permite escalabilidade e adição de novos sensores com baixo impacto no código base.
+- **Confiabilidade Elevada:** Uso de WDT, IRQ seguras e filtragem por persistência elevam o projeto ao padrão de produto comercial.
+- **Auditabilidade:** Logs JSON estruturados facilitam a integração com sistemas de monitoramento externos.
+
+### Trade-offs e Limitações
+
+- **Ruído em Hardware Real:** Embora a média móvel e a persistência mitiguem ruídos, implementações físicas podem exigir janelas de amostragem maiores.
+- **Sincronização Temporal:** O timestamp (`ts`) é relativo ao tempo de boot. Implementações de produção requerem sincronização via NTP ou módulo RTC.
+- **Consumo de UI:** O feedback visual contínuo por LEDs, embora útil, representa um ponto de consumo que pode ser otimizado para dispositivos operando exclusivamente por bateria.
+
+---
+
+## 7. Conclusão
+
+O **SmartRoom Monitor** demonstra a viabilidade de implementar controle robusto e inteligente em hardware embarcado de baixo custo. Através do uso de técnicas avançadas como máquinas de estados temporizadas, interrupções seguras e modularização de código, o projeto atende com rigor aos requisitos técnicos e de inovação, operando como uma solução confiável para a preservação de recursos energéticos.
