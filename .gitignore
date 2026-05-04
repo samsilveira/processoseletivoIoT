@@ -1,1 +1,20 @@
+# Ambientes
 .env
+.venv/
+env/
+venv/
+
+# MicroPython / Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Binários Gerados (Wokwi/Build)
+fs.bin
+binaries/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
